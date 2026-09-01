@@ -1,0 +1,51 @@
+# HADIS artifact -- pinned to the versions the reported results were produced with.
+# Python 3.8 (see README.md for the conda command).
+
+# --- serving core -----------------------------------------------------------
+grpcio==1.66.1
+grpcio-tools==1.66.1
+protobuf==5.27.3
+
+# --- resource allocation (MILP/ILP) -----------------------------------------
+# Needs a licence; see README.md section 3.
+gurobipy==11.0.3
+
+# --- diffusion models -------------------------------------------------------
+torch==2.0.1
+torchvision==0.15.2
+diffusers==0.31.0
+transformers==4.46.3
+accelerate==1.0.1
+safetensors==0.4.5
+huggingface-hub==0.26.2
+# SD3.5's T5 tokenizer fails to load without this, with a misleading error.
+sentencepiece==0.2.0
+
+# --- discriminator ----------------------------------------------------------
+# OpenAI CLIP is not on PyPI; the discriminator is a ViT-B/32 image encoder
+# plus a 2-layer head, so this is required for real-execution runs (E2).
+clip @ git+https://github.com/openai/CLIP.git
+
+# --- router feature extraction (not installed) -------------------------------
+# router/promptFeature.py needs spacy and wordfreq to regenerate
+# router/prompt_features.csv from raw prompts. Neither experiment calls it: the
+# artifact ships the precomputed features, and the router reads those.
+#
+# They are commented out because current spacy does not build on Python 3.8.
+# spacy 3.8 pulls thinc 8.3 and blis 1.0, which need numpy >= 2.0 at build time,
+# and numpy 2.0 requires Python >= 3.9. Installing them would mean either an
+# older spacy or a newer Python, and neither is worth it for a script the
+# experiments never run.
+#
+# To regenerate the features anyway, use a separate Python >= 3.9 environment:
+#   pip install spacy wordfreq && python -m spacy download en_core_web_sm
+# spacy
+# wordfreq
+
+# --- data handling and plotting ---------------------------------------------
+numpy==1.24.4
+pandas==1.4.3
+scipy==1.8.1
+Pillow==10.2.0
+matplotlib==3.6.3
+brokenaxes==0.6.2

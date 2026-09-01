@@ -1,0 +1,28 @@
+# Gurobi licences are per-user and node-locked. README section 3.3 tells the
+# reviewer to place their own at hadis/gurobi/gurobi.lic.
+hadis/gurobi/*.lic
+hadis/gurobi/*.lic.*
+
+# Run output. collect_logs.sh moves each run into results/logs/<system>/;
+# whatever is left here belongs to the last, uncollected run and contains local
+# paths and hostnames.
+hadis/logs/*
+!hadis/logs/.gitkeep
+
+# Hardware profiles are machine-specific: experiments/profile_gpu.py writes one
+# on the reviewer's own GPU.
+hadis/profiles/*.json
+
+# Collected runs and generated figures. collect_logs.sh fills results/logs/ and
+# the plot scripts write results/figures/; both are outputs of a reviewer's own
+# runs, so the directories ship empty.
+results/logs/*
+!results/logs/.gitkeep
+results/figures/*
+!results/figures/.gitkeep
+
+__pycache__/
+*.pyc
+.DS_Store
+
+sd_models/

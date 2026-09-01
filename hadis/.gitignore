@@ -1,0 +1,16 @@
+*.pdf
+*.jpg
+*.pyc
+logs/*.csv
+*.log
+# Model checkpoints are not committed, with one exception: the discriminator's
+# trained head (0.5 MB) is part of the artifact. Without it a clone has no
+# discriminator and E2 cannot run. The frozen CLIP encoder it attaches to is
+# fetched by clip.load at runtime, so only the head lives here.
+*.pt
+!discriminator/CLIP_discriminator_head.pt
+.DS_Store
+.ipynb_checkpoints/
+*.ipynb
+__pycache__/
+*gurobi.lic*

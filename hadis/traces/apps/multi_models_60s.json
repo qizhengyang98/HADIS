@@ -1,0 +1,35 @@
+{
+    "appID": "131",
+    "appName": "multi_model_cascade",
+    "latencySLOInMSec": 60000,
+    "root": {
+      "task": "sdxlltn",
+      "model_variants": ["sdxlltn"],
+      "children": [
+        {
+          "task": "sd35turbo",
+          "model_variants": ["sd35turbo"],
+          "children": [
+            {
+              "task": "sd35med",
+              "model_variants": ["sd35med"],
+              "children": [
+                {
+                  "task": "sd35large",
+                  "model_variants": ["sd35large"],
+                  "children": [
+                    {
+                      "task": "sink",
+                      "model_variants": ["sink"],
+                      "children": []
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    }
+  }
+  
