@@ -93,6 +93,22 @@ def get_do_simulate():
     return DO_SIMULATE
 
 
+# Real mode only. The discriminator runs on every generated image either way.
+# By default the rerouting decision uses the score precomputed for the query,
+# which keeps planning stable on a small testbed. 
+# Set by worker_re.py --live-discriminator to decide on the live discriminator output instead.
+LIVE_DISCRIMINATOR = False
+
+
+def set_live_discriminator(enabled=True):
+    global LIVE_DISCRIMINATOR
+    LIVE_DISCRIMINATOR = bool(enabled)
+
+
+def get_live_discriminator():
+    return LIVE_DISCRIMINATOR
+
+
 def set_do_simulate_true():
     global DO_SIMULATE
     DO_SIMULATE = True

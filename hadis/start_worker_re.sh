@@ -12,6 +12,9 @@
 #   --cache DIR   the HuggingFace cache holding ALL FOUR checkpoints: the
 #                 directory containing the models--<org>--<name> folders.
 #                 Defaults to $HADIS_MODEL_CACHE, else HuggingFace's own cache.
+#   --live-discriminator
+#                 escalate on the live discriminator output instead of the
+#                 score precomputed for each prompt (the default)
 #   --dry-run     print the ports and commands, then exit without launching
 #   --session     tmux session name (default hadis-workers-re)
 #
@@ -47,6 +50,7 @@ NUM_WORKERS=1
 BASE_PORT=$FIRST_PORT
 NODE=""
 DRY_RUN=0
+LIVE_FLAG=""
 SESSION="hadis-workers-re"
 CACHE="${HADIS_MODEL_CACHE:-}"
 while [ $# -gt 0 ]; do
@@ -57,6 +61,7 @@ while [ $# -gt 0 ]; do
         --base-port) BASE_PORT="$2"; NODE=""; shift 2 ;;
         --cache|--cache-dir) CACHE="$2"; shift 2 ;;
         --session) SESSION="$2"; shift 2 ;;
+        --live-discriminator) LIVE_FLAG="--live-discriminator"; shift ;;
         --dry-run) DRY_RUN=1; shift ;;
         *) echo "unknown argument: $1" >&2; exit 1 ;;
     esac
@@ -159,6 +164,7 @@ banner "workers (real execution)"
 echo "   controller: ${CIP}"
 echo "   workers   : ${NUM_WORKERS} on ports ${BASE_PORT}-$((BASE_PORT + NUM_WORKERS - 1))"
 echo "   cache     : ${CACHE:-<HuggingFace default>}"
+echo "   escalation: $([ -n "$LIVE_FLAG" ] && echo "live discriminator output" || echo "precomputed per-prompt scores (default)")"
 echo "   session   : ${SESSION}"
 echo
 echo "   First start loads ~78 GiB of weights per worker; allow several minutes"
@@ -184,7 +190,7 @@ for i in $(seq 0 $((NUM_WORKERS - 1))); do
     # pane, and a pane dies with its tmux session, so a traceback or a "Killed"
     # would be lost exactly when it is most needed.
     console="$ROOT/logs/console_w${port}.txt"
-    cmd="cd $ROOT/src/worker && $env_vars PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python $PY worker_re.py -cip $CIP -p $port 2>&1 | tee '$console'"
+    cmd="cd $ROOT/src/worker && $env_vars PROTOCOL_BUFFERS_PYTHON_IMPLEMENTATION=python $PY worker_re.py -cip $CIP -p $port $LIVE_FLAG 2>&1 | tee '$console'"
 
     if [ "$i" -eq 0 ]; then
         tmux new-session -d -s "$SESSION" -n "w$port"

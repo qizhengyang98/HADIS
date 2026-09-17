@@ -217,8 +217,9 @@ Two experiments, described step by step in **[Experiments.md](Experiments.md)**:
   execution driven by profiled latencies, a ~350 s replay peaking at 64 QPS. Run once
   per system for six systems: Clipper-Light, Clipper-Heavy, INFaaS-Acc, Proteus,
   DiffServe and HADIS, selected with `-ap 0` through `-ap 5`.
-- **E2, functional test on real GPUs.** 4 workers, real checkpoints, real router
-  and discriminator, a ~3500 s replay peaking at 1.6 QPS with a 60 s SLO. This is not
+- **E2, functional test on real GPUs.** 4 workers, real checkpoints, real router and discriminator, a ~3500 s replay peaking at 1.6 QPS
+  with a 60 s SLO. By default rerouting uses precomputed per-prompt scores;
+  `--live-discriminator` switches it to the live output (Experiments.md section 7). This is not
   a figure reproduction, because four GPUs cannot carry the paper's load. It
   demonstrates that the system serves end-to-end on real models and traces. The experiments
   in the paper are conducted on a testbed cluster that consists of 16 workers, each

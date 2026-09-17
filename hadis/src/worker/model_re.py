@@ -144,6 +144,8 @@ class LoadedModel:
         # a spawned child that re-imports config with its defaults; carry the mode
         # across explicitly so lookups in the child agree with the daemon.
         self.profile_driven = config.get_profile_driven()
+        self.live_discriminator = config.get_live_discriminator()
+        self.discriminatorPreprocess = None
         logging.info(config.mode_banner('model'))
 
         self.conf_dist_path = config.repo_path('discriminator', 'confidence_scores')
@@ -339,7 +341,10 @@ class LoadedModel:
         discModule = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(discModule)
 
-        clipModel, _ = clip.load('ViT-B/32', device='cpu')
+        clipModel, preprocess = clip.load('ViT-B/32', device='cpu')
+        # The input the discriminator was trained and scored with. The stored
+        # confidence scores were computed on images prepared this way.
+        self.discriminatorPreprocess = preprocess
         discriminator = discModule.CLIPDiscriminator(clipModel.float())
 
         head = os.path.join(discDir, 'CLIP_discriminator_head.pt')
@@ -361,6 +366,9 @@ class LoadedModel:
                 f'missing {headMissing}, unexpected {unexpected}')
 
         discriminator = discriminator.cuda().eval()
+        logging.info('loadDiscriminator: escalation uses the '
+                     + ('live discriminator output' if self.live_discriminator
+                        else 'precomputed per-prompt scores'))
         logging.info(f'loadDiscriminator: CLIP discriminator ready on GPU '
                      f'({os.path.basename(path)})')
         return discriminator
@@ -541,25 +549,31 @@ class LoadedModel:
             if isinstance(results, torch.Tensor):
                 image_tensors = results
             else:
-                image_tensors = torch.stack([transform(results.images[i]) for i in range(batch_size)])
+                prep = self.discriminatorPreprocess or transform
+                image_tensors = torch.stack([prep(results.images[i]) for i in range(batch_size)])
             image_tensors = image_tensors.cuda()
-            softmax = nn.Softmax()
             if self.do_simulate:
                 time.sleep(0.01)
             else:
-                with swap_lock:
-                    conf_scores = self.discriminator(image_tensors)
-                # conf_scores = softmax(conf_scores)
-                # conf_fake, conf_real = conf_scores[:,0], conf_scores[:,1]
+                with swap_lock, torch.no_grad():
+                    logits, _ = self.discriminator(image_tensors)
+                # Probability of the "real" class, the same quantity as the
+                # stored scores, moved to the CPU for the threshold comparison.
+                live_scores = torch.softmax(logits.float(), dim=1)[:, 1].cpu().numpy()
             if ALLOW_RANDOM: # Random assiging confidence score
                 rng = np.random.default_rng()
                 conf_scores = [rng.uniform(0.0,1.0) for i in conf_idx]
                 abs_conf_thres = self.conf_thres
             else:
-                conf_scores = self.conf_dist[conf_idx] # directly get data from pre-computed files
+                # The threshold is a percentile of the stored score distribution,
+                # which is what the planner assumes, in both modes.
                 sorted_dist = np.sort(self.conf_dist)
                 index = max(int(len(sorted_dist) * self.conf_thres) - 1, 0)
                 abs_conf_thres = sorted_dist[index]
+                if self.live_discriminator and not self.do_simulate:
+                    conf_scores = live_scores
+                else:
+                    conf_scores = self.conf_dist[conf_idx] # directly get data from pre-computed files
             results_qualified = [1 if cs>=abs_conf_thres else 0 for cs in conf_scores]
             logging.info(f'abs_conf_thres: {abs_conf_thres}, conf_score: {conf_scores}')
             

@@ -21,9 +21,8 @@ trace peaking at 64 QPS with a 6 s SLO. Run once per system, six methods in tota
 | 4 | DiffServe | `diffserve` |
 | 5 | HADIS | `hadis` |
 
-**E2, functional test on real GPUs.** 4 workers, real checkpoints, real router and
-real discriminator, a ~3500 s replay peaking at 1.6 QPS with a 60 s SLO. This is not a
-reproduction of a paper figure: four GPUs cannot carry the paper's load. It
+**E2, functional test on real GPUs.** 4 workers, real checkpoints, real router and real discriminator, a ~3500 s replay peaking at 1.6 QPS
+with a 60 s SLO. This is not a reproduction of a paper figure: four GPUs cannot carry the paper's load. It
 demonstrates that the system serves end-to-end on real models and that the cascade
 routes between them. See section 7.
 
@@ -264,6 +263,11 @@ One per node, each with its own `--node` number. `--cache` is the folder where d
 
 **Give every node a different `--node`.** `start_worker_re.sh` runs `worker_re.py`, the real-execution worker. Run **one worker per node**: each holds all four variants in page-locked host memory.
 
+**How rerouting decision is made.** The discriminator runs on every generated image, but
+by default the rerouting decision uses the corresponding confidence score precomputed offline for each query using the same discriminator.
+This keeps results consistent and planning stable on a four-GPU testbed. To decide
+on the live discriminator output instead, add `--live-discriminator` to every
+`start_worker_re.sh` command. 
 
 That is ~78 GiB and the SD3.5 repositories are gated, so accept the licence on each model page and `huggingface-cli login` first.
 

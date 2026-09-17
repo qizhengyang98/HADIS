@@ -476,6 +476,12 @@ def solve_proteus_milp(model_latency_values, total_workers, slo, ewma_demand, fi
 
     m.optimize()
 
+    # Read solution values only from an optimal solve, as solve_milp_loop does.
+    if m.Status != GRB.OPTIMAL:
+        print(f'Proteus MILP found no optimal solution (Gurobi status {m.Status}); '
+              f'returning None')
+        return None
+
     allocation = {
         "device_allocation": {model_names[i]: int(w[i].x) for i in range(num_models)},
         "batch_sizes": {model_names[i]: allowed_batch_sizes[j]

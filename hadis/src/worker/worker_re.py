@@ -547,6 +547,7 @@ def serve(args):
     # Profile-driven mode implies simulated execution; --do_simulate remains
     # available on its own for debugging a real-mode deployment without GPUs.
     config.set_profile_driven(False)           # E2 is always real mode
+    config.set_live_discriminator(args.liveDiscriminator)
     if args.do_simulate:
         set_do_simulate_true()
     print(config.mode_banner(f'worker:{workerPort}'))
@@ -589,6 +590,10 @@ def getargs():
     # No --profile-driven here: E2 is real execution by definition, and a
     # simulated run belongs in worker.py. --do_simulate stays, for bringing a
     # deployment up and checking the plumbing without touching a GPU.
+    parser.add_argument('--live-discriminator', action='store_true', dest='liveDiscriminator',
+                        default=False,
+                        help='escalate on the live discriminator output instead of the '
+                             'score precomputed for each prompt (the default)')
     parser.add_argument('--do_simulate', action='store_true', default=False,
                         help='Simulate model execution (plumbing check, no GPU work)')
 
