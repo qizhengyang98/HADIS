@@ -289,3 +289,113 @@ python analysis/plot_e2_functional.py --log-dir hadis/logs
 
 Four panels: offered vs completed throughput, SLO violation over time, queries per
 second by model, and every model swap with its cost. **Run `experiments/remove_logs.sh` to clean all logs under `hadis/logs` before the next run(either for E1 or E2).**
+
+---
+
+## 8. E1 with one script: `run_E1.sh`
+
+`run_E1.sh` runs the whole E1 experiment and generates its results with a single command. It sets up every component on every node, runs each chosen system, collects the logs and plots Figure 7 automatically. It performs the steps of sections 3 and 4 for you, so there is no need to start, stop or collect anything by hand.
+
+### How it works
+
+The script runs in two roles:
+
+- **Head node**: drives the experiment. It starts the controller, load balancer, sink and client, tells the worker nodes when to start and stop their workers, collects the logs and plots.
+- **Worker nodes**: each runs an agent that connects to the head node and starts, checks and stops the workers on that node when the head node asks.
+
+For each chosen system, the head node:
+
+1. starts the controller, load balancer and sink, and waits until each one has launched and registered with the controller;
+2. starts the workers on every node through the agents, and waits until the controller has registered every worker and placed a model on each, and every worker has loaded its model and received a routing table;
+3. starts the client, which replays the trace (about 6 minutes);
+4. runs `stop_all.sh` on every node and collects the logs into `results/logs/<system>/`.
+
+After the last system it runs `analysis/plot_e1_end2end.py` and writes `results/figures/fig7_end2end.png`. Each system takes about 8 minutes, so all six take about 48 minutes.
+
+### Step 0: Before you start
+
+- `conda activate hadis` on the head node and on every worker node.
+- `hadis/logs/` must be empty. File an earlier run with `experiments/collect_logs.sh <name>` or discard it with `experiments/remove_logs.sh`.
+
+
+### Step 1: start an agent on each worker node
+
+On **each worker node**, run one agent. Give every node a different `--node` (1, 2, 3, ...) and set `-n` to the number of workers for that node, about one worker per 2 vCPUs. The workers across all nodes should add up to 16. For example, with one 16-vCPU node and two 8-vCPU nodes:
+
+```bash
+cd <artifact>
+./run_E1.sh --agent --head-ip <HEAD_IP> --node 1 -n 8    # worker node A, 16 vCPUs
+./run_E1.sh --agent --head-ip <HEAD_IP> --node 2 -n 4    # worker node B, 8 vCPUs
+./run_E1.sh --agent --head-ip <HEAD_IP> --node 3 -n 4    # worker node C, 8 vCPUs
+#   ...
+#   [16:51:10] Waiting for the head node ...
+```
+
+`<HEAD_IP>` is the head node's address as the worker nodes see it (`hostname -I` on the head node). Leave the agents running: they wait for the head node, and can be started before or after it.
+
+### Step 2: dry run on the head node
+
+`--nodes` is the number of worker nodes, i.e. the number of agents to wait for:
+
+```bash
+cd <artifact>
+./run_E1.sh --nodes 3 --dry-run
+```
+
+A dry run launches nothing. It:
+
+- checks the head node: the Python environment, tmux, the Gurobi licence and that `hadis/logs/` is empty;
+- waits for every agent to connect, which confirms that each worker node can reach the head node;
+- checks each worker node through its agent: its worker count and port range, tmux, that CUDA is visible, and whether its `hadis/logs/` is shared with the head node or holds old worker logs;
+- prints every command it would run, in order, on the head node and on each worker node, for every chosen system.
+
+```
+#   [ ok ] node 1 (nodeA): agent responded        8 workers on 16 vCPUs, ports 50051-50058
+#   [ ok ] node 1 (nodeA): tmux available
+#   [ ok ] node 1 (nodeA): CUDA visible
+#   ...
+#   total workers: 16
+#   ...
+#   All checks passed. The agents keep running: rerun this command without
+#   --dry-run to start (about 48 minutes).
+```
+
+Fix anything marked `[FAIL]` and dry-run again. The agents keep running after a dry run, so there is no need to restart them.
+
+### Step 3: run E1 on the head node
+
+Run the same command without `--dry-run`:
+
+```bash
+./run_E1.sh --nodes 3                  # all six systems
+```
+
+**Choosing systems.** `--systems` takes a comma separated list of the `-ap` numbers from section 1 and runs only those, in the given order. Without it all six run.
+
+```bash
+./run_E1.sh --nodes 3 --systems 5      # HADIS only, about 8 minutes: a quick end-to-end test
+./run_E1.sh --nodes 3 --systems 4,5    # DiffServe, then HADIS
+```
+
+Running one system first (`--systems 5`) is a good way to check the whole setup before the full run.
+
+The head node prints each step as it completes, and each agent prints the tasks it runs. The head node's output is also saved to `results/logs/run_E1_<time>.log`. At the end it prints a summary:
+
+```
+#   E1 summary  (48 min)
+#     Clipper-Light  ok  ... seconds of results in results/logs/clipper_light/
+#     ...
+#     HADIS          ok  ... seconds of results in results/logs/hadis/
+#     figure         results/figures/fig7_end2end.png
+```
+
+When a run (not a dry run) finishes, the agents exit. Start them again (Step 1) before the next run.
+
+### If something goes wrong
+
+- **A system fails** at any step: it is stopped on every node, its logs are filed under `results/logs/failed_<system>_<time>/`, and the run moves on to the next system.
+- **Ctrl-C on the head node** stops the workers on every node. The interrupted run's logs stay in `hadis/logs/`; clear them with `experiments/remove_logs.sh` before starting again.
+- **An agent stops responding** for 30 s: the current system fails with a message naming the node.
+- **Workers take longer than 300 s to settle** on a slow node: raise the limit with `READY_TIMEOUT=600 ./run_E1.sh --nodes 3`.
+- **Port 50047 is in use** on the head node: pass another port with `--agent-port <port>`, to the head node and to every agent.
+- **A result directory already exists**: `collect_logs.sh` moves the old `results/logs/<system>/` aside to `<system>_<time>` rather than overwriting it.
